@@ -1,0 +1,42 @@
+<h2>Inbox</h2>
+
+<% if @destinations.any? %>
+
+  <% if @inbox.any? %>
+    <% @inbox.last(10).each do |msg| %>
+      <div class="message">
+        <small>
+          <strong><%= @table[msg.origin_port].hostname %></strong> said:
+        </small>
+        <p><%= msg.content %></p>
+        <small>
+          at <strong><%= msg.time_str %></strong>
+        </small>
+      </div>
+    <% end %>
+  <% else %>
+    <strong><em>Inbox empty!</em></strong>
+  <% end %>
+
+  <hr>
+
+  <form action="/send_message" method="POST">
+    To:
+    <select name="port">
+      <% @destinations.each do |port, conn| %>
+        <option value="<%= port %>">
+          <%= conn.hostname + " : " + conn.port.to_s %>
+        </option>
+      <% end %>
+    </select>
+    <br><br>
+    <textarea name="content" placeholder="Hello..."></textarea>
+    <br>
+    <input type="submit" value="Send">
+  </form>
+<% else %>
+  <strong><em>Connect another client to the network to send/receive messages...</em></strong>
+<% end %>
+
+<hr>
+<%= erb(:routing_table) %>

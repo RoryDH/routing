@@ -3,7 +3,7 @@ require_relative "./node"
 class Router < Node
   def setup_connections
     loop do
-      puts "Would you like to connect to a router? (y/n)"
+      puts "\nConnect to another node? (y/n)"
       break unless gets.chomp == "y"
 
       add_connection
@@ -20,8 +20,18 @@ class Router < Node
     )
   end
 
-  def receive_message(json_body)
-    @table[json_body["destination_port"]].send_message()
+  def receive_message(msg)
+    destination = @table[msg.destination_port]
+    if destination
+      destination.fwd_message(msg)
+    else
+      raise "Message destination not found in table..."
+    end
   end
+
+  def render_frontend!
+    erb :router
+  end
+
 
 end

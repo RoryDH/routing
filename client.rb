@@ -2,7 +2,7 @@ require_relative "./node"
 
 class Client < Node
   def setup_connections
-    puts "Connect to one router..."
+    puts "\nConnect to one router..."
     add_connection
   end
 
@@ -16,8 +16,20 @@ class Client < Node
     )
   end
 
-  
-  def receive_message(json_body)
-    
+
+  def receive_message(msg)
+    puts "received message from #{msg.origin_port}"
+    msg.received!
+    @inbox.push(msg)
+  end
+
+
+  def render_frontend!
+    # create a table of only other client that aren't the current
+    @destinations = @table.reject do |port, conn|
+      @port == port || conn.type != "client"
+    end
+
+    erb :client
   end
 end

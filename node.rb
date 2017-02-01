@@ -2,6 +2,7 @@
 require 'sinatra/base'
 require 'json'
 require_relative './table_connection'
+require_relative './message'
 require 'pp'
 # configure do
 
@@ -16,14 +17,20 @@ class Node < Sinatra::Base
     @table = {}
     @port = port
 
+    @inbox = []
+    # @inbox = [Message.new({"content" => "hi"}), Message.new({"content" => "bai"})]
+    # @inbox.map(&:received!)
+
     prompt_for_hostname
     add_self_to_table
     setup_connections
     super()
+
+    puts "\nOPEN IN BROWSER http://localhost:#{@port}\n"
   end
 
   def add_connection
-    puts "Enter router info:"
+    puts "Enter node port:"
     print "localhost:"
     port = gets.chomp.to_i
 
@@ -36,8 +43,8 @@ class Node < Sinatra::Base
     )
     json_body = JSON.parse(@result.body)
     # pp json_body
-    receive_response(json_body)
-    pp @table
+    receive_table_updates(json_body)
+    # pp @table
   end
 
   def prompt_for_hostname
@@ -53,7 +60,8 @@ class Node < Sinatra::Base
     }
   end
 
-  def receive_response(response)
+  def receive_table_updates(response)
+    puts "Recieved a table from #{response["from_port"]}"
     table_changed = false
 
     response["table"].each do |port_str, conn|
@@ -67,12 +75,13 @@ class Node < Sinatra::Base
     end
 
     if table_changed
+      # only recommunicate to direct connections (excluding ourself and who we just spoke to)
       connections_to_recommunicate_to = @table.reject do |port, conn|
         port == response["from_port"] || port == @port || !conn.direct
       end
 
       if connections_to_recommunicate_to.any?
-        puts "Recommunicating table changes to #{connections_to_recommunicate_to.values.map(&:hostname).join(",")}"
+        puts "Recommunicating table changes to #{connections_to_recommunicate_to.keys}"
 
         connections_to_recommunicate_to.each do |port, conn|
           @result = HTTParty.post("http://127.0.0.1:#{port}/put_table",
@@ -81,12 +90,12 @@ class Node < Sinatra::Base
           )
           json_body = JSON.parse(@result.body)
           # pp json_body
-          receive_response(json_body)
+          receive_table_updates(json_body)
         end
 
-        pp @table
+        # pp @table
       else
-        puts "No Recommunicating Necessary!!"
+        puts "No recommunication necessary."
       end
     end
   end
@@ -95,30 +104,49 @@ class Node < Sinatra::Base
     request.body.rewind
     read_body = request.body.read
     if read_body && read_body.length > 2
-      @json_body = JSON.parse(read_body)
+      begin
+        @json_body = JSON.parse(read_body)
+      rescue JSON::ParserError => e
+        @json_body = nil
+      end
     end
   end
 
   post '/put_table' do
     content_type :json
-    puts "Recieved a table from #{@json_body["from_port"]} #{@json_body.to_json}"
-    receive_response(@json_body)
-    pp @table
+    receive_table_updates(@json_body)
+    # pp @table
     data_to_share(distance: @json_body["distance"]).to_json
   end
 
 
-  post '/put_message' do
-    # @json_body example like { destination_port: 10001, from_port: 10003, content: "YOYOYOYO", hops: 3 }
+  post '/send_message' do
+    destination_port = params[:port].to_i
+    if @table[destination_port]
+      msg = Message.new({
+        "content" => params[:content],
+        "destination_port" => destination_port,
+        "origin_port" => @port
+      })
+      @table[destination_port].fwd_message(msg)
+      redirect '/'
+    else
+      "ERROR: port not in table"
+    end
+  end
+
+  post '/fwd_message' do
+    # @json_body example like { destination_port: 10001, from_port: 10003, content: "YOYOYOYO" }
     content_type :json
-    puts "receiving message from #{@json_body["from_port"]} #{@json_body.to_json}"
-    receive_message(@json_body)
+
+    receive_message(Message.new(@json_body))
+
     { status: "ok" }.to_json
   end
 
   get '/' do
-    puts "LOL"
-    "SERVER!!!"
+    @html_title = "#{self.class.to_s.capitalize}: #{@hostname}"
+    render_frontend!
   end
 
 

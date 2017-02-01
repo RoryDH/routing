@@ -1,0 +1,23 @@
+<h3>Routing Table</h3>
+
+<table border=1>
+  <tr>
+    <th>type</th>
+    <th>port</th>
+    <th>distance</th>
+    <th>hostname</th>
+    <th>next_port</th>
+    <th>direct</th>
+  </tr>
+
+  <% @table.each do |port, conn| %>
+    <tr>
+      <td><%= conn.type %></td>
+      <td><%= conn.port %></td>
+      <td><%= conn.distance %></td>
+      <td><%= conn.hostname %></td>
+      <td><%= conn.next_port %></td>
+      <td><%= conn.direct %></td>
+    </tr>
+  <% end %>
+</table>
